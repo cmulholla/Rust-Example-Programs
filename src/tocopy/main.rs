@@ -4,7 +4,7 @@ to run:
  - use `.\main.exe` (or type main then tab)
  OR
  - use cargo build
- - use cargo run
+ - use cargo run (build not necessary)
 */
 
 /*
