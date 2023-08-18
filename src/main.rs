@@ -48,8 +48,8 @@ fn create_html_from_md(fpath: &str, fname: &str) {
     };
 
     let mut str_line: String;
-    let ulist: bool = false;
-    let last_ulist: bool = false;
+    let mut ulist: bool = false;
+    let mut last_ulist: bool;
     // File hosts.txt must exist in the current path
     if let Ok(lines) = read_lines(fullfpath) {
         // Consumes the iterator, returns an (Optional) String
@@ -60,52 +60,57 @@ fn create_html_from_md(fpath: &str, fname: &str) {
                 
                 // convert string into character vector to make it easier to pick apart
                 //let char_line: Vec<char> = str_line.chars().collect::<Vec<_>>();
+                // REMOVED: turned into a for loop enumerating through each character. Could be better - see class construction of this program (TODO)
 
                 // Replace anything markdown related with the HTML counterpart
                 let mut header: usize = 0;
                 let mut possible_ulist: bool = false;
                 let mut new_line: String = String::new();
+                last_ulist = ulist;
+                ulist = false;
                 for (i, ch) in str_line.chars().enumerate() {
 
+                    // header tracking
                     if i == header && ch == '#' {
                         header += 1;
                     }
+
+                    // ulist tracking
                     if i == 0 && ch == '-' {
                         possible_ulist = true;
                     }
                     else if i == 1 && ch == ' ' && possible_ulist {
                         // TODO: make ulist end by tracking last string using the last_ulist variable
-                        if !ulist {
-                            new_line = "<ul>\n<li>".to_string();
+                        if !last_ulist {
+                            new_line = "<ul>\n".to_string();
                         }
-                        else {
-
-                        }
+                        ulist = true
                     }
                 }
                 // Find the middle part of the string
-                let str_start: usize = header+(1*((header>0) as usize));
+                let str_start: usize = header+(1*((header>0) as usize)) + 2*(ulist as usize);
                 let str_middle: String = str_line.chars().skip(str_start).take(str_line.len()).collect();
+
+                if !ulist && last_ulist {
+                    new_line += "</ul>\n";
+                }
 
                 // put the header in
                 if header > 0 {
-                    new_line = format!("<h{}>{}</h{0}>", header, str_middle);
-                }
-                else if new_line.is_empty() {
-                    new_line = format!("<p>{}</p>", str_middle);
+                    new_line += &format!("<h{}>{}</h{0}>\n", header, str_middle);
                 }
                 else if ulist {
-                    new_line += &format!("<li>{}</li>", str_middle);
+                    new_line += &format!("<li>{}</li>\n", str_middle);
                 }
                 else {
-                    new_line += &str_middle;
+                    new_line += &format!("<p>{}</p>\n", str_middle);
                 }
 
 
                 // Write the string to `file`, returns `io::Result<()>`
                 match file.write_all(new_line.as_bytes()) {
                     Err(why) => panic!("couldn't write to {}: {}", display, why),
-                    Ok(_) => {println!("successfully wrote to {}", display)},
+                    Ok(_) => {println!("successfully wrote to {} : {}", display, ulist)},
                 }
             }
         }
