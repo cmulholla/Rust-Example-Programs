@@ -29,7 +29,8 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines())
 }
 
-// main function
+// main functions
+
 // takes in a markdown file path and name and converts it into an html file
 fn create_html_from_md(fpath: &str, fname: &str) {
     // Concat the file path and name
@@ -47,6 +48,8 @@ fn create_html_from_md(fpath: &str, fname: &str) {
     };
 
     let mut str_line: String;
+    let ulist: bool = false;
+    let last_ulist: bool = false;
     // File hosts.txt must exist in the current path
     if let Ok(lines) = read_lines(fullfpath) {
         // Consumes the iterator, returns an (Optional) String
@@ -60,11 +63,24 @@ fn create_html_from_md(fpath: &str, fname: &str) {
 
                 // Replace anything markdown related with the HTML counterpart
                 let mut header: usize = 0;
-                let new_line: String;
+                let mut possible_ulist: bool = false;
+                let mut new_line: String = String::new();
                 for (i, ch) in str_line.chars().enumerate() {
 
                     if i == header && ch == '#' {
                         header += 1;
+                    }
+                    if i == 0 && ch == '-' {
+                        possible_ulist = true;
+                    }
+                    else if i == 1 && ch == ' ' && possible_ulist {
+                        // TODO: make ulist end by tracking last string using the last_ulist variable
+                        if !ulist {
+                            new_line = "<ul>\n<li>".to_string();
+                        }
+                        else {
+
+                        }
                     }
                 }
                 // Find the middle part of the string
@@ -75,9 +91,16 @@ fn create_html_from_md(fpath: &str, fname: &str) {
                 if header > 0 {
                     new_line = format!("<h{}>{}</h{0}>", header, str_middle);
                 }
-                else {
+                else if new_line.is_empty() {
                     new_line = format!("<p>{}</p>", str_middle);
                 }
+                else if ulist {
+                    new_line += &format!("<li>{}</li>", str_middle);
+                }
+                else {
+                    new_line += &str_middle;
+                }
+
 
                 // Write the string to `file`, returns `io::Result<()>`
                 match file.write_all(new_line.as_bytes()) {
