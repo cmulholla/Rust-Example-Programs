@@ -13,13 +13,21 @@ to create:
  - use cargo add <dependancy>
 */
 
+// helper functions
+
+
 struct HTML(String);
 
 struct Markdown(String);
 
+fn print_file (fname: &str) -> Markdown {
+    let md: Markdown = Markdown(fname.to_string());
+    return md;
+}
+
 impl Markdown {
     fn from_file(filename: &str) -> Self {
-        todo!()
+        print_file("potato")
     }
 }
 
