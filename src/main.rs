@@ -29,12 +29,22 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines())
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum List {
+    UnorderedList,
+    OrderedList,
+    PossibleUlist,
+    PossibleOlist,
+    NotList,
+}
+
 #[derive(Clone)]
 struct HTML {
     fpath: String,
     fname: String,
     contents: String,
-    in_ulist: bool,
+    list_data: List,
+    list_height: usize,
 }
 
 impl HTML {
@@ -43,7 +53,8 @@ impl HTML {
             fpath: String::new(),
             fname: String::new(),
             contents: String::new(),
-            in_ulist: false,
+            list_data: List::NotList,
+            list_height: 0,
         }
     }
 }
@@ -68,8 +79,8 @@ impl Markdown {
 // returns the line in HTML style
 fn convert_line (line: String, storage: &mut HTML) -> String {
     let mut header: usize = 0;
-    let mut ulist: bool = false;
-    let mut new_line: String = line.clone();
+    let mut new_list: List = List::NotList;
+    let mut new_line: String = String::new();
     // do things to convert the md line to HTML
     for (i, ch) in line.chars().enumerate() {
 
@@ -77,20 +88,90 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
         if i == header && ch == '#' {
             header += 1;
         }
+
+        // ulist tracking
+        if i == 0 && (ch == '-' || ch == '+' || ch == '*') {
+            new_list = List::PossibleUlist;
+        }
+        else if i == 1 && ch == ' ' && new_list == List::PossibleUlist {
+            // add <ul> to the beginning of the string if the html is not a list yet
+            if storage.list_data == List::NotList {
+                new_line = "<ul>\n".to_string();
+            }
+            storage.list_data = List::UnorderedList;
+            new_list = List::UnorderedList;
+        }
+        // olist tracking
+        else if (i == 0 || new_list == List::PossibleOlist) && ( 
+            ch == '1' ||
+            ch == '2' ||
+            ch == '3' ||
+            ch == '4' ||
+            ch == '5' ||
+            ch == '6' ||
+            ch == '7' ||
+            ch == '8' ||
+            ch == '9' )
+        {
+            new_list = List::PossibleOlist;
+        }
+        else if new_list == List::PossibleOlist && ch == ' ' {
+            // add <ol> to the beginning of the string if the html is not a list yet
+            if storage.list_data == List::NotList {
+                new_line = "<ol>\n".to_string();
+            }
+            storage.list_data = List::OrderedList;
+            new_list = List::OrderedList;
+        }
+        else if ch == '\t' && storage.list_data != List::NotList && storage.list_height == 0 && i == 0 {
+            // recurse without character
+            // remove first character
+            let mut chars = new_line.chars();
+            chars.next();
+            new_line = chars.as_str().to_string();
+            // say that there is no list as to trick it into making another <ol> or <ul>
+            let temp_list_data = storage.list_data;
+            storage.list_data = List::NotList;
+            new_line = convert_line(new_line.clone(), storage);
+            storage.list_data = temp_list_data;
+            // TODO: make tabs work with storage.list_height
+        }
+
+    }
+
+    // if there was a leading space but nothing else, return to NotList
+    if new_list == List::PossibleUlist || new_list == List::PossibleOlist {
+        new_list = List::NotList;
     }
 
     // Find the middle part of the string
-    let str_start: usize = header+(1*((header>0) as usize)) + 2*(ulist as usize);
+    let str_start: usize =  header + (1*((header>0) as usize)) + 
+                            2 * ((new_list != List::NotList) as usize) +
+                            storage.list_height;
+    
     let str_middle: String = line.chars().skip(str_start).take(line.len()).collect();
     // put the header in
     if header > 0 {
         new_line = format!("<h{}>{}</h{0}>\n", header, str_middle);
+        // headers do not cause recursion
+    }
+    else if new_list != List::NotList {
+        // add the list
+        new_line += &format!("<li>{}</li>\n", str_middle);
+        //TODO: recurse w/ str_middle to find if header w/out list
     }
     else {
-        new_line = format!("{}\n", str_middle);
+        // end the list
+        if storage.list_data == List::UnorderedList {
+            new_line = "</ul>\n".to_string();
+        }
+        if storage.list_data == List::OrderedList {
+            new_line = "</ol>\n".to_string();
+        }
+        new_line += &format!("{}\n", str_middle);
     }
 
-    storage.in_ulist = ulist;
+    storage.list_data = new_list;
     print!("{}", new_line);
     return new_line;
 }
@@ -126,9 +207,10 @@ impl HTML {
         Self::from_file(&md.fpath, &md.fname)
     }
 
-    pub fn to_file(html: Self) {
+    // convert the contents of the HTML datatype into a file specified within the HTML datatype
+    pub fn to_file(&self) {
         // Create a path to a new file
-        let new_full_fpath: String = format!("{}{}{}", html.fpath, html.fname, ".html");
+        let new_full_fpath: String = format!("{}{}{}", self.fpath, self.fname, ".html");
         let path: &Path = Path::new(&new_full_fpath);
         let display: std::path::Display<'_> = path.display();
 
@@ -139,7 +221,7 @@ impl HTML {
         };
 
         // Write the string to `file`, returns `io::Result<()>`
-        match file.write_all(html.contents.as_bytes()) {
+        match file.write_all(self.contents.as_bytes()) {
             Err(why) => panic!("couldn't write to {}: {}", display, why),
             Ok(_) => {println!("successfully wrote to {}", display)},
         }
@@ -157,7 +239,7 @@ fn run_md() {
 
     let html: HTML = HTML::from_markdown(md);
     println!("{}", html.contents);
-    HTML::to_file(html);
+    html.to_file();
 
 }
 
