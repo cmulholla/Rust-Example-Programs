@@ -18,8 +18,15 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 use std::io::{self, BufRead};
+use regex::Regex;
 
 // helper functions
+
+fn regex_bool(regex: &str, to_match: &str) -> bool {
+    let re = Regex::new(regex).unwrap();
+    let Some(_not) = re.captures(to_match) else { return false};
+    true
+}
 
 // The output is wrapped in a Result to allow matching on errors
 // Returns an Iterator to the Reader of the lines of the file.
@@ -89,6 +96,7 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
             header += 1;
         }
 
+        /*
         // ulist tracking
         if i == 0 && (ch == '-' || ch == '+' || ch == '*') {
             new_list = List::PossibleUlist;
@@ -135,9 +143,34 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
             new_line = convert_line(new_line.clone(), storage);
             storage.list_data = temp_list_data;
             // TODO: make tabs work with storage.list_height
-        }
+        }*/
+
+        // maybe try pattern matching with regex lol, see below under this for statement
 
     }
+    // this should find a number, a period, then text. ex: 1. hi!
+    if regex_bool(r"[0-9]+\. .+", &line) {
+        if storage.list_data == List::NotList {
+            new_line = "<ol>\n".to_string();
+        }
+        else if storage.list_data == List::UnorderedList {
+            new_line = "</ul>\n<ol>\n".to_string();
+        }
+        storage.list_data = List::OrderedList;
+        new_list = List::OrderedList;
+    }
+    else if regex_bool(r"[-+] .+", &line) {
+        // add <ul> to the beginning of the string if the html is not a list yet
+        if storage.list_data == List::NotList {
+            new_line = "<ul>\n".to_string();
+        }
+        else if storage.list_data == List::OrderedList {
+            new_line = "</ol>\n<ul>\n".to_string();
+        }
+        storage.list_data = List::UnorderedList;
+        new_list = List::UnorderedList;
+    }
+    //(?<y>[0-9]{4})-(?<m>[0-9]{2})-(?<d>[0-9]{2})
 
     // if there was a leading space but nothing else, return to NotList
     if new_list == List::PossibleUlist || new_list == List::PossibleOlist {
@@ -150,9 +183,20 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
                             storage.list_height;
     
     let str_middle: String = line.chars().skip(str_start).take(line.len()).collect();
+
+    // end the list
+    if new_list == List::NotList {
+        if storage.list_data == List::UnorderedList {
+            new_line = "</ul>\n".to_string();
+        }
+        else if storage.list_data == List::OrderedList {
+            new_line = "</ol>\n".to_string();
+        }
+    }
+
     // put the header in
     if header > 0 {
-        new_line = format!("<h{}>{}</h{0}>\n", header, str_middle);
+        new_line += &format!("<h{}>{}</h{0}>\n", header, str_middle);
         // headers do not cause recursion
     }
     else if new_list != List::NotList {
@@ -161,13 +205,6 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
         //TODO: recurse w/ str_middle to find if header w/out list
     }
     else {
-        // end the list
-        if storage.list_data == List::UnorderedList {
-            new_line = "</ul>\n".to_string();
-        }
-        if storage.list_data == List::OrderedList {
-            new_line = "</ol>\n".to_string();
-        }
         new_line += &format!("{}\n", str_middle);
     }
 
