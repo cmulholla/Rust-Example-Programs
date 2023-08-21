@@ -22,10 +22,11 @@ use regex::Regex;
 
 // helper functions
 
-fn regex_bool(regex: &str, to_match: &str) -> bool {
+fn regex_bool(regex: &str, to_match: &str) -> (bool, String) {
     let re = Regex::new(regex).unwrap();
-    let Some(_not) = re.captures(to_match) else { return false};
-    true
+    let Some(captured_str) = re.captures(to_match) else { return (false, String::new()) };
+    //println!("{:?}", captured_str);
+    return (true, (&captured_str[1]).to_string());
 }
 
 // The output is wrapped in a Result to allow matching on errors
@@ -148,18 +149,24 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
         // maybe try pattern matching with regex lol, see below under this for statement
 
     }
-    // this should find a number, a period, then text. ex: 1. hi!
-    if regex_bool(r"[0-9]+\. .+", &line) {
+
+    let mut str_start: usize = 0;
+    // this should find a number, a period, then text. ex: 1. hi! (olist)
+    let olist_match = regex_bool(r"([0-9]+\.\ ).+", &line);
+    if olist_match.0 {
         if storage.list_data == List::NotList {
             new_line = "<ol>\n".to_string();
         }
         else if storage.list_data == List::UnorderedList {
             new_line = "</ul>\n<ol>\n".to_string();
         }
+        str_start += olist_match.1.len();
+        
         storage.list_data = List::OrderedList;
         new_list = List::OrderedList;
     }
-    else if regex_bool(r"[-+] .+", &line) {
+    // this should find a - or +, then text. ex: - hi! (ulist)
+    else if regex_bool(r"([-+]\ ).+", &line).0 {
         // add <ul> to the beginning of the string if the html is not a list yet
         if storage.list_data == List::NotList {
             new_line = "<ul>\n".to_string();
@@ -178,8 +185,8 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
     }
 
     // Find the middle part of the string
-    let str_start: usize =  header + (1*((header>0) as usize)) + 
-                            2 * ((new_list != List::NotList) as usize) +
+    str_start +=  header + (1*((header>0) as usize)) + 
+                            2 * ((new_list == List::UnorderedList) as usize) +
                             storage.list_height;
     
     let str_middle: String = line.chars().skip(str_start).take(line.len()).collect();
@@ -260,7 +267,7 @@ impl HTML {
         // Write the string to `file`, returns `io::Result<()>`
         match file.write_all(self.contents.as_bytes()) {
             Err(why) => panic!("couldn't write to {}: {}", display, why),
-            Ok(_) => {println!("successfully wrote to {}", display)},
+            Ok(_) => {/*println!("successfully wrote to {}", display)*/},
         }
     }
 }
@@ -269,13 +276,13 @@ fn run_md() {
     let string: &str = "Hello World!";
     println!("{}", string);
     let md: Markdown = Markdown {
-        fpath: r#"E:\Programs\Sync\Notes\"#.to_string(),
+        fpath: /*r#"E:\Programs\Sync\Notes\"*/ r#"C:\Users\cmulholla\Sync\Notes\"#.to_string(),
         fname: "NASA internship guide".to_string(),
         contents: String::new() 
     };
 
     let html: HTML = HTML::from_markdown(md);
-    println!("{}", html.contents);
+    //println!("{}", html.contents);
     html.to_file();
 
 }
