@@ -19,6 +19,9 @@ use std::io::prelude::*;
 use std::path::Path;
 use std::io::{self, BufRead};
 use regex::Regex;
+use std::fmt;
+
+
 
 // helper functions
 
@@ -62,6 +65,23 @@ impl HTML {
             contents: String::new(),
             list_data: Vec::new(),
         }
+    }
+}
+
+impl fmt::Display for HTML {
+    // This trait requires `fmt` with this exact signature.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Write strictly the first element into the supplied output
+        // stream: `f`. Returns `fmt::Result` which indicates whether the
+        // operation succeeded or failed. Note that `write!` uses syntax which
+        // is very similar to `println!`.
+        write!(f, r"{{ ");
+        for (i, l) in self.list_data.iter().enumerate() {
+            
+            write!(f, "{}, ", l);
+        }
+        write(f, "}");
+        Ok(())
     }
 }
 
@@ -152,13 +172,12 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
 
     // find how many "\t" characters there are
     let mut olist_match = regex_bool(r"(\t+)[-+[0-9]+]\ .+", &line);
-    println!("{}: {}", olist_match.0, olist_match.1.len());
+    //println!("{}: {}", olist_match.0, olist_match.1.len());
     if olist_match.0 && olist_match.1.len() == storage.list_data.len() + 1 {
         // if there's an indentation, create a new <ol> or <ul> by adding 1 to the list_height and recursing
         let str_middle: String = line.chars().skip(olist_match.1.len()).take(line.len()).collect();
-        let ostorage = storage.list_data;
-        storage.list_data = List::NotList;
         new_line = convert_line(str_middle, storage);
+        
 
         return format!("{}{}", olist_match.1, new_line);
     }
@@ -166,27 +185,29 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
     // this should find a number, a period, then text. ex: 1. hi! (olist)
     olist_match = regex_bool(r"([0-9]+\.\ ).+", &line);
     if olist_match.0 {
-        if storage.list_data == List::NotList {
+        if storage.list_data.is_empty() {
             new_line = "<ol>\n".to_string();
         }
-        else if storage.list_data == List::UnorderedList {
+        else if storage.list_data.ends_with(&[List::UnorderedList]) {
             new_line = "</ul>\n<ol>\n".to_string();
+            storage.list_data.pop();
         }
         str_start += olist_match.1.len();
         
-        storage.list_data = List::OrderedList;
+        storage.list_data.push(List::OrderedList);
         new_list = List::OrderedList;
     }
     // this should find a - or +, then text. ex: - hi! (ulist)
     else if regex_bool(r"([-+]\ ).+", &line).0 {
         // add <ul> to the beginning of the string if the html is not a list yet
-        if storage.list_data == List::NotList {
+        if storage.list_data.is_empty() {
             new_line = "<ul>\n".to_string();
         }
-        else if storage.list_data == List::OrderedList {
+        else if storage.list_data.ends_with(&[List::OrderedList]) {
             new_line = "</ol>\n<ul>\n".to_string();
+            storage.list_data.pop();
         }
-        storage.list_data = List::UnorderedList;
+        storage.list_data.push(List::UnorderedList);
         new_list = List::UnorderedList;
     }
     //(?<y>[0-9]{4})-(?<m>[0-9]{2})-(?<d>[0-9]{2})
@@ -198,18 +219,19 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
 
     // Find the middle part of the string
     str_start +=  header + (1*((header>0) as usize)) + 
-                            2 * ((new_list == List::UnorderedList) as usize) +
-                            storage.list_height;
+                            2 * ((new_list == List::UnorderedList) as usize);
     
     let str_middle: String = line.chars().skip(str_start).take(line.len()).collect();
 
     // end the list
     if new_list == List::NotList {
-        if storage.list_data == List::UnorderedList {
+        if storage.list_data.ends_with(&[List::UnorderedList]) {
             new_line = "</ul>\n".to_string();
+            storage.list_data.pop();
         }
-        else if storage.list_data == List::OrderedList {
+        else if storage.list_data.ends_with(&[List::OrderedList]) {
             new_line = "</ol>\n".to_string();
+            storage.list_data.pop();
         }
     }
 
@@ -227,8 +249,7 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
         new_line += &format!("{}\n", str_middle);
     }
 
-    storage.list_data = new_list;
-    print!("{}", new_line);
+    print!("{}{}", new_line, storage.list_data);
     return new_line;
 }
 
