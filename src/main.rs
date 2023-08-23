@@ -41,12 +41,25 @@ where P: AsRef<Path>, {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum List {
+pub enum List {
     UnorderedList,
     OrderedList,
     PossibleUlist,
     PossibleOlist,
     NotList,
+}
+
+impl fmt::Display for List {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            List::NotList => write!(f, "NotList"),
+            List::OrderedList => write!(f, "OrderedList"),
+            List::PossibleOlist => write!(f, "Possible-OrderedList"),
+            List::UnorderedList => write!(f, "UnorderedList"),
+            List::PossibleUlist => write!(f, "Possible-UnorderedList"),
+            _ => write!(f, "empty/error"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -76,12 +89,10 @@ impl fmt::Display for HTML {
         // operation succeeded or failed. Note that `write!` uses syntax which
         // is very similar to `println!`.
         write!(f, r"{{ ");
-        for (i, l) in self.list_data.iter().enumerate() {
-            
-            write!(f, "{}, ", l);
+        for l in self.list_data.iter() {
+            write!(f, "{}", l);
         }
-        write(f, "}");
-        Ok(())
+        write!(f, "}}")
     }
 }
 
@@ -172,7 +183,7 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
 
     // find how many "\t" characters there are
     let mut olist_match = regex_bool(r"(\t+)[-+[0-9]+]\ .+", &line);
-    //println!("{}: {}", olist_match.0, olist_match.1.len());
+    println!("{}: {}", olist_match.0, olist_match.1.len());
     if olist_match.0 && olist_match.1.len() == storage.list_data.len() + 1 {
         // if there's an indentation, create a new <ol> or <ul> by adding 1 to the list_height and recursing
         let str_middle: String = line.chars().skip(olist_match.1.len()).take(line.len()).collect();
@@ -187,14 +198,14 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
     if olist_match.0 {
         if storage.list_data.is_empty() {
             new_line = "<ol>\n".to_string();
+            storage.list_data.push(List::OrderedList);
         }
         else if storage.list_data.ends_with(&[List::UnorderedList]) {
             new_line = "</ul>\n<ol>\n".to_string();
             storage.list_data.pop();
+            storage.list_data.push(List::OrderedList);
         }
         str_start += olist_match.1.len();
-        
-        storage.list_data.push(List::OrderedList);
         new_list = List::OrderedList;
     }
     // this should find a - or +, then text. ex: - hi! (ulist)
@@ -202,12 +213,13 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
         // add <ul> to the beginning of the string if the html is not a list yet
         if storage.list_data.is_empty() {
             new_line = "<ul>\n".to_string();
+            storage.list_data.push(List::UnorderedList);
         }
         else if storage.list_data.ends_with(&[List::OrderedList]) {
             new_line = "</ol>\n<ul>\n".to_string();
             storage.list_data.pop();
+            storage.list_data.push(List::UnorderedList);
         }
-        storage.list_data.push(List::UnorderedList);
         new_list = List::UnorderedList;
     }
     //(?<y>[0-9]{4})-(?<m>[0-9]{2})-(?<d>[0-9]{2})
@@ -249,7 +261,7 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
         new_line += &format!("{}\n", str_middle);
     }
 
-    print!("{}{}", new_line, storage.list_data);
+    println!("{}List Data: {}", new_line, storage);
     return new_line;
 }
 
