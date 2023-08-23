@@ -51,8 +51,7 @@ struct HTML {
     fpath: String,
     fname: String,
     contents: String,
-    list_data: List,
-    list_height: usize,
+    list_data: Vec<List>,
 }
 
 impl HTML {
@@ -61,8 +60,7 @@ impl HTML {
             fpath: String::new(),
             fname: String::new(),
             contents: String::new(),
-            list_data: List::NotList,
-            list_height: 0,
+            list_data: Vec::new(),
         }
     }
 }
@@ -151,8 +149,22 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
     }
 
     let mut str_start: usize = 0;
+
+    // find how many "\t" characters there are
+    let mut olist_match = regex_bool(r"(\t+)[-+[0-9]+]\ .+", &line);
+    println!("{}: {}", olist_match.0, olist_match.1.len());
+    if olist_match.0 && olist_match.1.len() == storage.list_data.len() + 1 {
+        // if there's an indentation, create a new <ol> or <ul> by adding 1 to the list_height and recursing
+        let str_middle: String = line.chars().skip(olist_match.1.len()).take(line.len()).collect();
+        let ostorage = storage.list_data;
+        storage.list_data = List::NotList;
+        new_line = convert_line(str_middle, storage);
+
+        return format!("{}{}", olist_match.1, new_line);
+    }
+
     // this should find a number, a period, then text. ex: 1. hi! (olist)
-    let olist_match = regex_bool(r"([0-9]+\.\ ).+", &line);
+    olist_match = regex_bool(r"([0-9]+\.\ ).+", &line);
     if olist_match.0 {
         if storage.list_data == List::NotList {
             new_line = "<ol>\n".to_string();
