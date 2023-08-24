@@ -118,65 +118,13 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
     let mut header: usize = 0;
     let mut new_list: List = List::NotList;
     let mut new_line: String = String::new();
+    
     // do things to convert the md line to HTML
-    for (i, ch) in line.chars().enumerate() {
 
-        // header tracking
-        if i == header && ch == '#' {
-            header += 1;
-        }
-
-        /*
-        // ulist tracking
-        if i == 0 && (ch == '-' || ch == '+' || ch == '*') {
-            new_list = List::PossibleUlist;
-        }
-        else if i == 1 && ch == ' ' && new_list == List::PossibleUlist {
-            // add <ul> to the beginning of the string if the html is not a list yet
-            if storage.list_data == List::NotList {
-                new_line = "<ul>\n".to_string();
-            }
-            storage.list_data = List::UnorderedList;
-            new_list = List::UnorderedList;
-        }
-        // olist tracking
-        else if (i == 0 || new_list == List::PossibleOlist) && ( 
-            ch == '1' ||
-            ch == '2' ||
-            ch == '3' ||
-            ch == '4' ||
-            ch == '5' ||
-            ch == '6' ||
-            ch == '7' ||
-            ch == '8' ||
-            ch == '9' )
-        {
-            new_list = List::PossibleOlist;
-        }
-        else if new_list == List::PossibleOlist && ch == ' ' {
-            // add <ol> to the beginning of the string if the html is not a list yet
-            if storage.list_data == List::NotList {
-                new_line = "<ol>\n".to_string();
-            }
-            storage.list_data = List::OrderedList;
-            new_list = List::OrderedList;
-        }
-        else if ch == '\t' && storage.list_data != List::NotList && storage.list_height == 0 && i == 0 {
-            // recurse without character
-            // remove first character
-            let mut chars = new_line.chars();
-            chars.next();
-            new_line = chars.as_str().to_string();
-            // say that there is no list as to trick it into making another <ol> or <ul>
-            let temp_list_data = storage.list_data;
-            storage.list_data = List::NotList;
-            new_line = convert_line(new_line.clone(), storage);
-            storage.list_data = temp_list_data;
-            // TODO: make tabs work with storage.list_height
-        }*/
-
-        // maybe try pattern matching with regex lol, see below under this for statement
-
+    // header tracking regex
+    let header_find = regex_bool(r"(#+)\ .+", &line);
+    if header_find.0 {
+        header = header_find.1.len();
     }
 
     let mut str_start: usize = 0;
@@ -318,8 +266,8 @@ impl HTML {
 }
 
 fn run_md() {
-    let string: &str = "Hello World!";
-    println!("{}", string);
+    
+    
     let md: Markdown = Markdown {
         fpath: /*r#"E:\Programs\Sync\Notes\"*/ r#"C:\Users\cmulholla\Sync\Notes\"#.to_string(),
         fname: "NASA internship guide".to_string(),
