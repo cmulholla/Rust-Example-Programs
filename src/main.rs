@@ -83,14 +83,14 @@ impl HTML {
 
 impl fmt::Display for HTML {
     // This trait requires `fmt` with this exact signature.
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), std::fmt::Error> {
         // Write strictly the first element into the supplied output
         // stream: `f`. Returns `fmt::Result` which indicates whether the
         // operation succeeded or failed. Note that `write!` uses syntax which
         // is very similar to `println!`.
         write!(f, r"{{ ");
         for l in self.list_data.iter() {
-            write!(f, "{}", l);
+            write!(f, "{}, ", l);
         }
         write!(f, "}}")
     }
@@ -112,27 +112,33 @@ impl Markdown {
     }
 }
 
+// counts the amount of '#' characters if formatted correctly
+fn count_header(line: &str) -> usize {
+    // header tracking regex
+    let header_find = regex_bool(r"(#+)\ .+", line);
+    if header_find.0 {
+        return header_find.1.len();
+    }
+    return 0;
+}
+
 // input a single line of the file, and the storage variable
 // returns the line in HTML style
 fn convert_line (line: String, storage: &mut HTML) -> String {
-    let mut header: usize = 0;
+    let header: usize;
     let mut new_list: List = List::NotList;
     let mut new_line: String = String::new();
+    let mut str_start: usize = 0;
     
     // do things to convert the md line to HTML
-
-    // header tracking regex
-    let header_find = regex_bool(r"(#+)\ .+", &line);
-    if header_find.0 {
-        header = header_find.1.len();
-    }
-
-    let mut str_start: usize = 0;
+    
+    header = count_header(&line);
 
     // find how many "\t" characters there are
     let mut olist_match = regex_bool(r"(\t+)[-+[0-9]+]\ .+", &line);
     println!("{}: {}", olist_match.0, olist_match.1.len());
     if olist_match.0 && olist_match.1.len() == storage.list_data.len() + 1 {
+        println!("test1");
         // if there's an indentation, create a new <ol> or <ul> by adding 1 to the list_height and recursing
         let str_middle: String = line.chars().skip(olist_match.1.len()).take(line.len()).collect();
         new_line = convert_line(str_middle, storage);
@@ -202,6 +208,7 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
     }
     else if new_list != List::NotList {
         // add the list
+
         new_line += &format!("<li>{}</li>\n", str_middle);
         //TODO: recurse w/ str_middle to find if header w/out list
     }
