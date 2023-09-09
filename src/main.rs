@@ -133,18 +133,35 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
     // do things to convert the md line to HTML
     
     header = count_header(&line);
-
+    println!("");
     // find how many "\t" characters there are
     let mut olist_match = regex_bool(r"(\t+)[-+[0-9]+]\ .+", &line);
-    println!("{}: {}", olist_match.0, olist_match.1.len());
-    if olist_match.0 && olist_match.1.len() == storage.list_data.len() + 1 {
-        println!("test1");
+    if olist_match.0 && (olist_match.1.len() == storage.list_data.len()) {
+        
         // if there's an indentation, create a new <ol> or <ul> by adding 1 to the list_height and recursing
         let str_middle: String = line.chars().skip(olist_match.1.len()).take(line.len()).collect();
+        let first_list: List = storage.list_data[0];
+        storage.list_data.remove(0);
         new_line = convert_line(str_middle, storage);
+        storage.list_data.insert(0, first_list);
+        println!("tabbed: {} :: amount: {}", olist_match.0, olist_match.1.len());
+        println!("List Data: {} :: line: {}", storage, line);
         
 
         return format!("{}{}", olist_match.1, new_line);
+    }
+    else if storage.list_data.len() > 0 && olist_match.1.len() < storage.list_data.len() - 1 {
+        // list has ended/moved down. reflect in new list
+        println!("tabbed: {} :: amount: {}", olist_match.0, olist_match.1.len());
+        println!("List Data: {} :: line: {}", storage, line);
+        println!("{}", "Tab down?");
+        if storage.list_data.ends_with(&[List::UnorderedList]) {
+            new_line += "</ul>";
+        }
+        else {
+            new_line += "</ol>";
+        }
+        storage.list_data.pop();
     }
 
     // this should find a number, a period, then text. ex: 1. hi! (olist)
@@ -216,7 +233,6 @@ fn convert_line (line: String, storage: &mut HTML) -> String {
         new_line += &format!("{}\n", str_middle);
     }
 
-    println!("{}List Data: {}", new_line, storage);
     return new_line;
 }
 
